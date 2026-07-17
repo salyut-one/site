@@ -1,0 +1,21 @@
+[Unit]
+Description=salyut.one website
+After=network.target
+
+[Service]
+Type=simple
+User=salyut-web
+Group=salyut-bbs-web
+ExecStart=/usr/local/bin/salyut-site
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

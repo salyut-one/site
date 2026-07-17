@@ -1,0 +1,45 @@
+body {
+  background-color: #212121;
+  color: #fafafa;
+  max-width: 85ch;
+  margin: 2rem auto;
+  padding: 0 1.25rem;
+  line-height: 1.5;
+}
+
+hr {
+  border: none;
+  height: 2px;
+  background-color: #424242;
+}
+
+a,
+a:visited,
+a:hover,
+a:active,
+a:focus,
+.toplinks {
+  color: #bababa;
+  font-family: monospace;
+}
+
+.toplinks {
+  display: flex;
+  gap: 1ch;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.footer {
+  color: #bababa;
+  font-size: 12px;
+}
+
+.users {
+  columns: 3 14ch;
+  padding-left: 1.5rem;
+}
+
+.users li {
+  break-inside: avoid;
+}
