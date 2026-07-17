@@ -36,10 +36,5 @@ a:focus,
 }
 
 .users {
-  columns: 3 14ch;
   padding-left: 1.5rem;
-}
-
-.users li {
-  break-inside: avoid;
 }

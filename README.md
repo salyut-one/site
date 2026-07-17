@@ -2,7 +2,9 @@
 
 The website for [salyut.one](https://salyut.one). It serves the home page at
 `/` and builds `/users` from the normal local accounts in `/etc/passwd`, with a
-link from each username to that user's `/~username` personal page.
+link from each username to that user's `/~username` personal page. Users are
+ordered by the birth time of their home directories, oldest first; accounts
+whose home-directory birth time is unavailable appear last.
 
 The HTTP server listens on `127.0.0.1:8082` by default and is intended to sit
 behind the TLS reverse proxy for `salyut.one`. The reverse proxy should continue
@@ -44,5 +46,6 @@ systemctl enable --now salyut-site.service
 ```
 
 The included unit reuses the unprivileged `salyut-web` account from
-`salyut-bbs`. Point the root site's reverse-proxy location at port 8082 while
-leaving its existing `/~username` user-directory location in place.
+`salyut-bbs` and gives it read-only access to home-directory metadata. Point
+the root site's reverse-proxy location at port 8082 while leaving its existing
+`/~username` user-directory location in place.

@@ -1,9 +1,12 @@
 use std::{
+    cmp::Ordering,
+    collections::BTreeMap,
     fs,
     net::ToSocketAddrs,
     path::{Path, PathBuf},
     sync::Arc,
     thread,
+    time::SystemTime,
 };
 
 use anyhow::{Context, Result};
@@ -36,6 +39,20 @@ struct Config {
     passwd: PathBuf,
     uid_min: u32,
     uid_max: u32,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+struct Account {
+    username: String,
+    uid: u32,
+    home: PathBuf,
+}
+
+#[derive(Debug)]
+struct User {
+    username: String,
+    uid: u32,
+    created: Option<SystemTime>,
 }
 
 fn main() -> Result<()> {
@@ -146,19 +163,32 @@ fn serve(request: Request, config: &Config) {
     }
 }
 
-fn read_users(path: &Path, uid_min: u32, uid_max: u32) -> Result<Vec<String>> {
+fn read_users(path: &Path, uid_min: u32, uid_max: u32) -> Result<Vec<User>> {
     let passwd = fs::read_to_string(path)
         .with_context(|| format!("read account database {}", path.display()))?;
-    let mut users = passwd
+    let mut accounts = BTreeMap::new();
+    for account in passwd
         .lines()
-        .filter_map(|line| parse_user(line, uid_min, uid_max))
+        .filter_map(|line| parse_account(line, uid_min, uid_max))
+    {
+        accounts.entry(account.username.clone()).or_insert(account);
+    }
+
+    let mut users = accounts
+        .into_values()
+        .map(|account| User {
+            created: fs::metadata(&account.home)
+                .and_then(|metadata| metadata.created())
+                .ok(),
+            username: account.username,
+            uid: account.uid,
+        })
         .collect::<Vec<_>>();
-    users.sort_unstable();
-    users.dedup();
+    sort_users(&mut users);
     Ok(users)
 }
 
-fn parse_user(line: &str, uid_min: u32, uid_max: u32) -> Option<String> {
+fn parse_account(line: &str, uid_min: u32, uid_max: u32) -> Option<Account> {
     let mut fields = line.split(':');
     let username = fields.next()?;
     fields.next()?;
@@ -166,7 +196,27 @@ fn parse_user(line: &str, uid_min: u32, uid_max: u32) -> Option<String> {
     if !(uid_min..=uid_max).contains(&uid) || !valid_username(username) {
         return None;
     }
-    Some(username.to_owned())
+    fields.next()?;
+    fields.next()?;
+    let home = fields.next()?;
+    Some(Account {
+        username: username.to_owned(),
+        uid,
+        home: PathBuf::from(home),
+    })
+}
+
+fn sort_users(users: &mut [User]) {
+    users.sort_by(|left, right| {
+        match (left.created, right.created) {
+            (Some(left), Some(right)) => left.cmp(&right),
+            (Some(_), None) => Ordering::Less,
+            (None, Some(_)) => Ordering::Greater,
+            (None, None) => Ordering::Equal,
+        }
+        .then_with(|| left.uid.cmp(&right.uid))
+        .then_with(|| left.username.cmp(&right.username))
+    });
 }
 
 fn valid_username(username: &str) -> bool {
@@ -183,14 +233,14 @@ fn valid_username(username: &str) -> bool {
         })
 }
 
-fn users_page(users: &[String]) -> String {
+fn users_page(users: &[User]) -> String {
     let list = if users.is_empty() {
         "<p>There are no users yet.</p>".to_owned()
     } else {
         let entries = users
             .iter()
-            .map(|username| {
-                let username = escape(username);
+            .map(|user| {
+                let username = escape(&user.username);
                 format!("<li><a href=\"/~{username}\">~{username}</a></li>")
             })
             .collect::<Vec<_>>()
@@ -304,29 +354,38 @@ fn escape(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, time::SystemTime};
+    use std::{
+        fs,
+        time::{Duration, SystemTime},
+    };
 
-    use super::{parse_user, read_users, users_page, valid_username};
+    use super::{User, parse_account, read_users, sort_users, users_page, valid_username};
 
     #[test]
     fn parses_only_normal_local_users() {
-        assert_eq!(
-            parse_user(
-                "alice:x:1000:1000:Alice:/home/alice:/bin/bash",
-                1000,
-                60_000
-            ),
-            Some("alice".to_owned())
+        let account = parse_account(
+            "alice:x:1000:1000:Alice:/home/alice:/bin/bash",
+            1000,
+            60_000,
         );
         assert_eq!(
-            parse_user("root:x:0:0:root:/root:/bin/bash", 1000, 60_000),
+            account.as_ref().map(|account| account.username.as_str()),
+            Some("alice")
+        );
+        assert_eq!(account.as_ref().map(|account| account.uid), Some(1000));
+        assert_eq!(
+            account.as_ref().map(|account| account.home.as_path()),
+            Some(std::path::Path::new("/home/alice"))
+        );
+        assert_eq!(
+            parse_account("root:x:0:0:root:/root:/bin/bash", 1000, 60_000),
             None
         );
         assert_eq!(
-            parse_user("nobody:x:65534:65534:Nobody:/:/sbin/nologin", 1000, 60_000),
+            parse_account("nobody:x:65534:65534:Nobody:/:/sbin/nologin", 1000, 60_000),
             None
         );
-        assert_eq!(parse_user("broken", 1000, 60_000), None);
+        assert_eq!(parse_account("broken", 1000, 60_000), None);
     }
 
     #[test]
@@ -354,12 +413,59 @@ mod tests {
         .unwrap();
         let users = read_users(&path, 1000, 60_000).unwrap();
         fs::remove_file(path).unwrap();
-        assert_eq!(users, ["alice", "zara"]);
+        assert_eq!(
+            users
+                .iter()
+                .map(|user| user.username.as_str())
+                .collect::<Vec<_>>(),
+            ["alice", "zara"]
+        );
+    }
+
+    #[test]
+    fn sorts_oldest_users_first_and_unknown_dates_last() {
+        let epoch = SystemTime::UNIX_EPOCH;
+        let mut users = vec![
+            User {
+                username: "unknown".to_owned(),
+                uid: 1000,
+                created: None,
+            },
+            User {
+                username: "new".to_owned(),
+                uid: 1002,
+                created: Some(epoch + Duration::from_secs(20)),
+            },
+            User {
+                username: "old".to_owned(),
+                uid: 1001,
+                created: Some(epoch + Duration::from_secs(10)),
+            },
+        ];
+        sort_users(&mut users);
+        assert_eq!(
+            users
+                .iter()
+                .map(|user| user.username.as_str())
+                .collect::<Vec<_>>(),
+            ["old", "new", "unknown"]
+        );
     }
 
     #[test]
     fn user_page_links_to_tilde_pages() {
-        let page = users_page(&["alice".to_owned(), "zara".to_owned()]);
+        let page = users_page(&[
+            User {
+                username: "alice".to_owned(),
+                uid: 1000,
+                created: None,
+            },
+            User {
+                username: "zara".to_owned(),
+                uid: 1001,
+                created: None,
+            },
+        ]);
         assert!(page.contains("<a href=\"/\">[Home]</a>"));
         assert!(!page.contains("<a href=\"/users\">[User List]</a>"));
         assert!(page.contains("href=\"/~alice\">~alice</a>"));
