@@ -216,7 +216,7 @@ fn home_page() -> String {
          <li>Static Web Hosting (HTTPS, Gopher, Gemini)</li>\
          <li>Bulletin Board System (BBS, viewable over CLI or \
          <a href=\"https://bbs.salyut.one\">web</a>)</li>\
-         <li>Finger (accessible via CLI or https://now.salyut.one/~username)</li>\
+         <li>Finger (accessible via CLI or <a href=\"https://now.salyut.one/\">here</a>)</li>\
          <li>And more, coming soon!</li></ul><hr>\
          <h2>Ethos</h2>\
          <p>salyut.one is <i>almost</i> (we'll get to it in a moment) entirely \
