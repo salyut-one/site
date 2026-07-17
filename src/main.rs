@@ -262,8 +262,8 @@ fn home_page() -> String {
          <a href=\"/~michal/\">~michal</a> (me!) in <s>2021</s> 2026.</p><hr>\
          <h2>Services</h2><ul>\
          <li>SSH Access</li>\
-         <li>E-Mail (incl. Webmail and Mutt for CLI)</li>\
-         <li>Static Web Hosting (HTTPS, Gopher, Gemini)</li>\
+         <li>E-Mail (bring-your-own client or Neomutt for CLI)</li>\
+         <li>Static Web Hosting (Currently HTTPS. Gopher, Gemini soon)</li>\
          <li>Bulletin Board System (BBS, viewable over CLI or \
          <a href=\"https://bbs.salyut.one\">web</a>)</li>\
          <li>Finger (accessible via CLI or <a href=\"https://now.salyut.one/\">here</a>)</li>\
