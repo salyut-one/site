@@ -109,6 +109,10 @@ fn serve(request: Request, config: &Config) {
     }
 
     let path = request.url().split('?').next().unwrap_or("/");
+    if let Some(location) = user_site_redirect(path) {
+        redirect(request, &location);
+        return;
+    }
     match path {
         "/" => respond(
             request,
@@ -231,6 +235,11 @@ fn valid_username(username: &str) -> bool {
         && bytes.all(|byte| {
             byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_' || byte == b'-'
         })
+}
+
+fn user_site_redirect(path: &str) -> Option<String> {
+    let username = path.strip_prefix("/~")?;
+    valid_username(username).then(|| format!("/~{username}/"))
 }
 
 fn users_page(users: &[User]) -> String {
@@ -359,7 +368,9 @@ mod tests {
         time::{Duration, SystemTime},
     };
 
-    use super::{User, parse_account, read_users, sort_users, users_page, valid_username};
+    use super::{
+        User, parse_account, read_users, sort_users, user_site_redirect, users_page, valid_username,
+    };
 
     #[test]
     fn parses_only_normal_local_users() {
@@ -395,6 +406,15 @@ mod tests {
         assert!(!valid_username("2test"));
         assert!(!valid_username("UPPER"));
         assert!(!valid_username("../etc"));
+    }
+
+    #[test]
+    fn redirects_only_a_bare_user_site_path_to_its_directory_form() {
+        assert_eq!(user_site_redirect("/~rose"), Some("/~rose/".to_owned()));
+        assert_eq!(user_site_redirect("/~rose/"), None);
+        assert_eq!(user_site_redirect("/~rose/index.html"), None);
+        assert_eq!(user_site_redirect("/~Rose"), None);
+        assert_eq!(user_site_redirect("/users"), None);
     }
 
     #[test]
