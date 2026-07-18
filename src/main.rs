@@ -273,9 +273,10 @@ fn home_page() -> String {
          <li>SSH Access</li>\
          <li>E-Mail (bring-your-own client or Neomutt for CLI)</li>\
          <li>Static Web Hosting (Currently HTTPS. Gopher, Gemini soon)</li>\
-         <li>Bulletin Board System (BBS, viewable over CLI or \
-         <a href=\"https://bbs.salyut.one\">web</a>)</li>\
-         <li>Finger (accessible via CLI or <a href=\"https://now.salyut.one/\">here</a>)</li>\
+         <li><a href=\"https://bbs.salyut.one\">Bulletin Board System</a> \
+         (BBS, also available over CLI)</li>\
+         <li><a href=\"https://now.salyut.one/\">Finger</a> \
+         (also available over CLI)</li>\
          <li>And more, coming soon!</li></ul><hr>\
          <h2>Ethos</h2>\
          <p>salyut.one is <i>almost</i> (we'll get to it in a moment) entirely \

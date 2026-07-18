@@ -1,10 +1,11 @@
 # salyut-site
 
-The website for [salyut.one](https://salyut.one). It serves the home page at
-`/` and builds `/users` from the normal local accounts in `/etc/passwd`, with a
-link from each username to that user's `/~username` personal page. Users are
-ordered by the birth time of their home directories, oldest first; accounts
-whose home-directory birth time is unavailable appear last.
+The website for [salyut.one](https://salyut.one), an all-purpose, small,
+tilde-adjacent pubnix running Fedora 44. It serves the home page at `/` and
+builds `/users` from the normal local accounts in `/etc/passwd`, with a link
+from each username to that user's `/~username` personal page. Users are ordered
+by the birth time of their home directories, oldest first; accounts whose
+home-directory birth time is unavailable appear last.
 
 The HTTP server listens on `127.0.0.1:8082` by default and is intended to sit
 behind the TLS reverse proxy for `salyut.one`. The reverse proxy should continue
@@ -14,8 +15,8 @@ site home page and user list, not the contents of users' home directories.
 ## Build and test
 
 ```sh
-cargo test --locked
-cargo build --release --locked
+make check
+make build
 ```
 
 For local development with a fixture account database:
@@ -35,12 +36,12 @@ salyut-site --listen 127.0.0.1:8082 --passwd /etc/passwd \
 
 ## Fedora 44
 
-Install the release binary and systemd unit, then enable the service:
+Build and install the release binary and systemd unit, then enable the service:
 
 ```sh
-install -m 0755 target/release/salyut-site /usr/local/bin/salyut-site
-install -m 0644 etc/systemd/system/salyut-site.service \
-  /etc/systemd/system/salyut-site.service
+make check
+make build
+sudo make install
 systemctl daemon-reload
 systemctl enable --now salyut-site.service
 ```
