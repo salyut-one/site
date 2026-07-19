@@ -29,21 +29,11 @@ salyut-site --listen 127.0.0.1:8082 \
   --pinky /usr/bin/pinky --pinky-timeout-seconds 3
 ```
 
-## Fedora 44
-
-Build and install the release binary and systemd unit, then enable the service:
+## Deploying
 
 ```sh
-make check
-make build
-sudo make install
-sudo useradd --system --gid salyut-bbs --home-dir /nonexistent \
-  --shell /usr/sbin/nologin salyut-web
-systemctl daemon-reload
-systemctl enable --now salyut-site.service
+salyut-admin update
 ```
 
-The included unit runs as the unprivileged `salyut-web` account in the
-`salyut-bbs` group, so the site uses the same daemon socket as the terminal
-client. The BBS daemon independently rejects mutations from that identity.
-Point the root site's reverse proxy at port 8082.
+## License
+[MIT](./LICENSE)
