@@ -9,13 +9,16 @@ use axum::{
     Router,
     body::Body,
     extract::Path,
-    http::{Request, StatusCode, Uri},
+    http::{Request, StatusCode, Uri, header},
     response::{Html, IntoResponse, Redirect, Response},
+    routing::get,
 };
 use clap::Parser;
 use tower::ServiceExt;
 use tower_http::services::ServeDir;
 
+const INDEX: &str = include_str!("../static/index.html");
+const STYLE: &str = include_str!("../static/style.css");
 const USER_LIST: &str = include_str!("../templates/users.html");
 
 #[derive(Debug, Parser)]
@@ -50,18 +53,22 @@ fn bbs_socket() -> PathBuf {
 #[tokio::main]
 async fn main() -> Result<()> {
     let arguments = Arguments::parse();
-    let static_ = ServeDir::new("static");
 
     let app = Router::new()
-        .route("/~{username}", axum::routing::get(redirect_user_site))
-        .route("/~{username}/{*path}", axum::routing::get(render_user_site))
-        .route("/users", axum::routing::get(get_users))
+        .route("/", get(|| async { Html(INDEX) }))
+        .route("/index.html", get(|| async { Redirect::permanent("/") }))
+        .route(
+            "/style.css",
+            get(|| async { ([(header::CONTENT_TYPE, "text/css; charset=utf-8")], STYLE) }),
+        )
+        .route("/~{username}", get(redirect_user_site))
+        .route("/~{username}/{*path}", get(render_user_site))
+        .route("/users", get(get_users))
         .merge(bbs::router(arguments.bbs_socket))
         .merge(now::router(
             arguments.pinky,
             Duration::from_secs(arguments.pinky_timeout_seconds),
-        ))
-        .fallback_service(static_);
+        ));
 
     let listener = tokio::net::TcpListener::bind(arguments.listen)
         .await

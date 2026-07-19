@@ -7,7 +7,6 @@ Type=simple
 User=salyut-web
 Group=salyut-bbs
 ExecStart=/usr/local/bin/salyut-site
-WorkingDirectory=/usr/local/src/salyut-site
 Restart=on-failure
 NoNewPrivileges=true
 PrivateTmp=true

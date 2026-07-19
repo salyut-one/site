@@ -37,7 +37,6 @@ jobs:
           groupadd --system salyut-bbs
           useradd --system --gid salyut-bbs \
             --home-dir /nonexistent --shell /usr/sbin/nologin salyut-web
-          install -d /usr/local/src/salyut-site
           make install
           systemd-analyze verify /etc/systemd/system/salyut-site.service
           test -x /usr/local/bin/salyut-site
