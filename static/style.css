@@ -1,0 +1,130 @@
+:root {
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: #212121;
+  color: #fafafa;
+  max-width: 85ch;
+  margin: 2rem auto;
+  padding: 0 1.25rem;
+  line-height: 1.5;
+}
+
+hr {
+  border: none;
+  height: 2px;
+  background-color: #424242;
+}
+
+a,
+a:visited,
+a:hover,
+a:active,
+a:focus,
+.toplinks {
+  color: #bababa;
+  font-family: monospace;
+}
+
+.toplinks {
+  display: flex;
+  gap: 1ch;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+a:focus-visible {
+  outline: 2px solid #fafafa;
+  outline-offset: 2px;
+}
+
+.footer,
+small {
+  color: #bababa;
+  font-size: 12px;
+}
+
+.users {
+  padding-left: 1.5rem;
+}
+
+.boards,
+.posts,
+.poll ul {
+  padding-left: 1.5rem;
+}
+
+.boards li,
+.posts li,
+.poll li {
+  margin: 0.5rem 0;
+}
+
+pre {
+  font-family: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.byline,
+.empty,
+.locked {
+  color: #bababa;
+}
+
+.reply {
+  border-left: 2px solid #424242;
+  margin: 1rem 0;
+  padding-left: 1rem;
+}
+
+.poll-meter {
+  background: #424242;
+  height: 0.65rem;
+  margin-top: 0.25rem;
+  max-width: 30rem;
+}
+
+.poll-meter span {
+  background: #bababa;
+  display: block;
+  height: 100%;
+}
+
+form {
+  display: flex;
+  gap: 0.5rem;
+  max-width: 28rem;
+}
+
+input,
+button {
+  background: #212121;
+  border: 1px solid #bababa;
+  color: #fafafa;
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+}
+
+input:focus-visible,
+button:focus-visible {
+  outline: 2px solid #fafafa;
+  outline-offset: 2px;
+}
+
+input {
+  flex: 1;
+  min-width: 0;
+}
+
+button {
+  color: #bababa;
+  cursor: pointer;
+}

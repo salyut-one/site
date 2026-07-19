@@ -7,8 +7,17 @@ description = "The salyut.one website"
 
 [dependencies]
 anyhow = "1.0"
+axum = { version = "0.8", default-features = false, features = ["http1", "query", "tokio"] }
 clap = { version = "4.5", features = ["derive"] }
-tiny_http = "0.12"
+serde = { version = "1.0", features = ["derive"] }
+salyut-bbs = { git = "https://github.com/salyut-one/bbs.git", default-features = false }
+tokio = { version = "1", features = ["net", "process", "rt-multi-thread", "time"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.7.0", features = ["fs"] }
+users = "0.11.0"
+
+[dev-dependencies]
+serde_json = "1.0"
 
 [profile.release]
 lto = "thin"

@@ -1,16 +1,8 @@
 # salyut-site
 
-The website for [salyut.one](https://salyut.one), an all-purpose, small,
-tilde-adjacent pubnix running Fedora 44. It serves the home page at `/` and
-builds `/users` from the normal local accounts in `/etc/passwd`, with a link
-from each username to that user's `/~username` personal page. Users are ordered
-by the birth time of their home directories, oldest first; accounts whose
-home-directory birth time is unavailable appear last.
-
-The HTTP server listens on `127.0.0.1:8082` by default and is intended to sit
-behind the TLS reverse proxy for `salyut.one`. The reverse proxy should continue
-to serve `/~username` from each user's `public_html`; this application owns the
-site home page and user list, not the contents of users' home directories.
+Web frontend for https://salyut.one. It serves the homepage, user sites, user
+list, the read-only BBS view at `/bbs`, and system `pinky -lb` output at
+`/now`.
 
 ## Build and test
 
@@ -19,19 +11,22 @@ make check
 make build
 ```
 
-For local development with a fixture account database:
+For local development alongside `salyut-bbsd`:
 
 ```sh
-cargo run -- --passwd ./test-passwd
+cargo run
 curl http://127.0.0.1:8082/users
+curl http://127.0.0.1:8082/bbs
+curl http://127.0.0.1:8082/now/~"$USER"
 ```
 
-The listen address, account database, normal-user UID range, and worker count
-are configurable:
+The listen address, BBS Unix socket, pinky binary, and pinky timeout are
+configurable:
 
 ```text
-salyut-site --listen 127.0.0.1:8082 --passwd /etc/passwd \
-  --uid-min 1000 --uid-max 60000 --workers 4
+salyut-site --listen 127.0.0.1:8082 \
+  --bbs-socket /run/salyut-bbs/users/salyut.sock \
+  --pinky /usr/bin/pinky --pinky-timeout-seconds 3
 ```
 
 ## Fedora 44
@@ -42,11 +37,13 @@ Build and install the release binary and systemd unit, then enable the service:
 make check
 make build
 sudo make install
+sudo useradd --system --gid salyut-bbs --home-dir /nonexistent \
+  --shell /usr/sbin/nologin salyut-web
 systemctl daemon-reload
 systemctl enable --now salyut-site.service
 ```
 
-The included unit reuses the unprivileged `salyut-web` account from
-`salyut-bbs` and gives it read-only access to home-directory metadata. Point
-the root site's reverse-proxy location at port 8082 while leaving its existing
-`/~username` user-directory location in place.
+The included unit runs as the unprivileged `salyut-web` account in the
+`salyut-bbs` group, so the site uses the same daemon socket as the terminal
+client. The BBS daemon independently rejects mutations from that identity.
+Point the root site's reverse proxy at port 8082.
