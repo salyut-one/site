@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    name: macOS checks
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install stable Rust
+        run: rustup toolchain install stable --profile minimal --component clippy,rustfmt
+      - name: Check
+        run: make check CARGO="cargo +stable"
+
+  fedora:
+    name: Fedora 44 build and install
+    runs-on: ubuntu-latest
+    container: fedora:44
+
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install build tools
+        run: dnf install -y cargo gcc git make rust shadow-utils systemd
+      - name: Build and test
+        run: |
+          make build
+          make test
+      - name: Install and check systemd unit
+        run: |
+          groupadd --system salyut-bbs
+          useradd --system --gid salyut-bbs \
+            --home-dir /nonexistent --shell /usr/sbin/nologin salyut-web
+          install -d /usr/local/src/salyut-site
+          make install
+          systemd-analyze verify /etc/systemd/system/salyut-site.service
+          test -x /usr/local/bin/salyut-site
