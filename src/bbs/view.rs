@@ -250,6 +250,6 @@ mod tests {
         assert!(html.contains("<title>&lt;Hello&gt; · salyut.one BBS</title>"));
         assert!(html.contains("&lt;script&gt;"));
         assert!(html.contains("&lt;reply&gt;"));
-        assert!(html.contains("href=\"/bbs\""));
+        assert!(html.contains("<a href=\"/\">[Home]</a>"));
     }
 }

@@ -31,6 +31,47 @@ pub fn escape(value: &str) -> String {
 mod tests {
     use super::{escape, valid_username};
 
+    fn toplinks(template: &str) -> Vec<&str> {
+        let (_, nav) = template
+            .split_once("<nav class=\"toplinks\">")
+            .expect("page has toplinks");
+        let (nav, _) = nav.split_once("</nav>").expect("toplinks are closed");
+        nav.lines()
+            .map(str::trim)
+            .filter(|line| line.starts_with("<a "))
+            .collect()
+    }
+
+    #[test]
+    fn managed_pages_have_consistent_toplinks() {
+        let general = [
+            r#"<a href="mailto:root@salyut.one">[Request Account]</a>"#,
+            r#"<a href="mailto:root@salyut.one">[Support]</a>"#,
+            r#"<a href="/bbs">[BBS]</a>"#,
+            r#"<a href="/now">[Pinky]</a>"#,
+        ];
+        assert_eq!(toplinks(include_str!("../static/index.html")), general);
+        assert_eq!(toplinks(include_str!("../templates/users.html")), general);
+        assert_eq!(
+            toplinks(include_str!("../templates/bbs.html")),
+            [
+                general[0],
+                general[1],
+                r#"<a href="/">[Home]</a>"#,
+                general[3]
+            ]
+        );
+        assert_eq!(
+            toplinks(include_str!("../templates/now.html")),
+            [
+                general[0],
+                general[1],
+                general[2],
+                r#"<a href="/">[Home]</a>"#
+            ]
+        );
+    }
+
     #[test]
     fn validates_only_portable_unix_usernames() {
         assert!(valid_username("michal"));
