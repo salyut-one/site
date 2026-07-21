@@ -1,3 +1,4 @@
+mod feed;
 mod view;
 
 use std::path::PathBuf;
@@ -6,7 +7,7 @@ use anyhow::Result;
 use axum::{
     Router,
     extract::{Path, State},
-    http::StatusCode,
+    http::{StatusCode, header::CONTENT_TYPE},
     response::{Html, IntoResponse, Redirect, Response},
     routing::get,
 };
@@ -18,6 +19,8 @@ pub fn router(socket: PathBuf) -> Router {
         .route("/bbs", get(index))
         .route("/bbs/", get(|| async { Redirect::permanent("/bbs") }))
         .route("/bbs/boards/{slug}", get(board))
+        .route("/bbs/boards/{slug}/rss.xml", get(rss))
+        .route("/bbs/boards/{slug}/atom.xml", get(atom))
         .route("/bbs/posts/{id}", get(post))
         .with_state(Client::new(socket))
 }
@@ -59,6 +62,50 @@ async fn board(State(client): State<Client>, Path(slug): Path<String>) -> Respon
 
 async fn post(State(client): State<Client>, Path(id): Path<i64>) -> Response {
     render(move || Ok(client.post(id)?.as_ref().map(view::post))).await
+}
+
+async fn rss(State(client): State<Client>, Path(slug): Path<String>) -> Response {
+    render_feed(client, slug, feed::Format::Rss).await
+}
+
+async fn atom(State(client): State<Client>, Path(slug): Path<String>) -> Response {
+    render_feed(client, slug, feed::Format::Atom).await
+}
+
+async fn render_feed(client: Client, slug: String, format: feed::Format) -> Response {
+    let operation = move || -> Result<Option<String>> {
+        let Some(board) = client
+            .boards()?
+            .into_iter()
+            .find(|board| board.slug == slug)
+        else {
+            return Ok(None);
+        };
+        let posts = client
+            .posts(&board.slug, feed::THREAD_LIMIT, 0)?
+            .into_iter()
+            .filter_map(|post| client.post(post.id).transpose())
+            .collect::<Result<Vec<_>>>()?;
+        Ok(Some(feed::render(format, &board, &posts)))
+    };
+
+    match tokio::task::spawn_blocking(operation).await {
+        Ok(Ok(Some(body))) => (
+            StatusCode::OK,
+            [(CONTENT_TYPE, format.content_type())],
+            body,
+        )
+            .into_response(),
+        Ok(Ok(None)) => (StatusCode::NOT_FOUND, "not found\n").into_response(),
+        Ok(Err(error)) => {
+            eprintln!("BBS feed request failed: {error:#}");
+            (StatusCode::BAD_GATEWAY, "BBS unavailable\n").into_response()
+        }
+        Err(error) => {
+            eprintln!("BBS feed task failed: {error}");
+            (StatusCode::INTERNAL_SERVER_ERROR, "BBS unavailable\n").into_response()
+        }
+    }
 }
 
 async fn render(operation: impl FnOnce() -> Result<Option<String>> + Send + 'static) -> Response {

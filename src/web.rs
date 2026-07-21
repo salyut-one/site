@@ -1,6 +1,11 @@
 pub fn page(template: &str, title: &str, content: &str) -> String {
+    page_with_head(template, title, content, "")
+}
+
+pub fn page_with_head(template: &str, title: &str, content: &str, head: &str) -> String {
     template
         .replace("{{TITLE}}", &escape(title))
+        .replace("{{HEAD}}", head)
         .replace("{{CONTENT}}", content)
 }
 

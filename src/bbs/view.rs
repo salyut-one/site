@@ -26,13 +26,30 @@ pub(super) fn board(board: &Board, posts: &[PostSummary]) -> String {
             posts.iter().map(post_row).collect::<String>()
         )
     };
-    page(
+    let feed_links = format!(
+        "<link rel=\"alternate\" type=\"application/rss+xml\" title=\"{} RSS\" \
+         href=\"/bbs/boards/{}/rss.xml\">\
+         <link rel=\"alternate\" type=\"application/atom+xml\" title=\"{} Atom\" \
+         href=\"/bbs/boards/{}/atom.xml\">",
+        web::escape(&board.name),
+        web::escape(&board.slug),
+        web::escape(&board.name),
+        web::escape(&board.slug),
+    );
+    web::page_with_head(
+        PAGE,
         &board.name,
         &format!(
-            "<h1>{}</h1><p>{}</p><hr><h2>Posts</h2>{posts}",
+            "<h1>{}</h1><p>{}</p><p class=\"feeds\">\
+             <a href=\"/bbs/boards/{}/rss.xml\">[RSS]</a> \
+             <a href=\"/bbs/boards/{}/atom.xml\">[Atom]</a></p>\
+             <hr><h2>Posts</h2>{posts}",
             web::escape(&board.name),
             web::escape(&board.description),
+            web::escape(&board.slug),
+            web::escape(&board.slug),
         ),
+        &feed_links,
     )
 }
 
@@ -215,7 +232,27 @@ pub(super) fn page(title: &str, content: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::post;
+    use super::{board, post};
+
+    #[test]
+    fn board_advertises_both_feed_formats() {
+        let fixture = serde_json::from_value(serde_json::json!({
+            "id": 1,
+            "slug": "general",
+            "name": "General",
+            "description": "General discussion",
+            "kind": "discussion",
+            "write_group": null
+        }))
+        .unwrap();
+        let html = board(&fixture, &[]);
+        assert!(html.contains(
+            "<link rel=\"alternate\" type=\"application/rss+xml\" title=\"General RSS\""
+        ));
+        assert!(html.contains("href=\"/bbs/boards/general/rss.xml\">[RSS]</a>"));
+        assert!(html.contains("href=\"/bbs/boards/general/atom.xml\">[Atom]</a>"));
+        assert!(!html.contains("{{HEAD}}"));
+    }
 
     #[test]
     fn escapes_authored_content() {
