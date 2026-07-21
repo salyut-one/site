@@ -18,6 +18,8 @@ pub fn router(socket: PathBuf) -> Router {
         .route("/healthz", get(health))
         .route("/bbs", get(index))
         .route("/bbs/", get(|| async { Redirect::permanent("/bbs") }))
+        .route("/bbs/rss.xml", get(global_rss))
+        .route("/bbs/atom.xml", get(global_atom))
         .route("/bbs/boards/{slug}", get(board))
         .route("/bbs/boards/{slug}/rss.xml", get(rss))
         .route("/bbs/boards/{slug}/atom.xml", get(atom))
@@ -64,12 +66,42 @@ async fn post(State(client): State<Client>, Path(id): Path<i64>) -> Response {
     render(move || Ok(client.post(id)?.as_ref().map(view::post))).await
 }
 
+async fn global_rss(State(client): State<Client>) -> Response {
+    render_global_feed(client, feed::Format::Rss).await
+}
+
+async fn global_atom(State(client): State<Client>) -> Response {
+    render_global_feed(client, feed::Format::Atom).await
+}
+
 async fn rss(State(client): State<Client>, Path(slug): Path<String>) -> Response {
     render_feed(client, slug, feed::Format::Rss).await
 }
 
 async fn atom(State(client): State<Client>, Path(slug): Path<String>) -> Response {
     render_feed(client, slug, feed::Format::Atom).await
+}
+
+async fn render_global_feed(client: Client, format: feed::Format) -> Response {
+    let operation = move || -> Result<Option<String>> {
+        let mut summaries = Vec::new();
+        for board in client.boards()? {
+            summaries.extend(client.posts(&board.slug, feed::THREAD_LIMIT, 0)?);
+        }
+        summaries.sort_by(|left, right| {
+            right
+                .updated_at
+                .cmp(&left.updated_at)
+                .then_with(|| right.id.cmp(&left.id))
+        });
+        summaries.truncate(feed::THREAD_LIMIT as usize);
+        let posts = summaries
+            .into_iter()
+            .filter_map(|post| client.post(post.id).transpose())
+            .collect::<Result<Vec<_>>>()?;
+        Ok(Some(feed::render_global(format, &posts)))
+    };
+    render_feed_response(operation, format).await
 }
 
 async fn render_feed(client: Client, slug: String, format: feed::Format) -> Response {
@@ -86,9 +118,16 @@ async fn render_feed(client: Client, slug: String, format: feed::Format) -> Resp
             .into_iter()
             .filter_map(|post| client.post(post.id).transpose())
             .collect::<Result<Vec<_>>>()?;
-        Ok(Some(feed::render(format, &board, &posts)))
+        Ok(Some(feed::render_board(format, &board, &posts)))
     };
 
+    render_feed_response(operation, format).await
+}
+
+async fn render_feed_response(
+    operation: impl FnOnce() -> Result<Option<String>> + Send + 'static,
+    format: feed::Format,
+) -> Response {
     match tokio::task::spawn_blocking(operation).await {
         Ok(Ok(Some(body))) => (
             StatusCode::OK,

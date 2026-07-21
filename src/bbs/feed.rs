@@ -18,6 +18,13 @@ impl Format {
             Self::Atom => "application/atom+xml; charset=utf-8",
         }
     }
+
+    const fn slug(self) -> &'static str {
+        match self {
+            Self::Rss => "rss",
+            Self::Atom => "atom",
+        }
+    }
 }
 
 struct Entry<'a> {
@@ -29,8 +36,44 @@ struct Entry<'a> {
     updated: DateTime<Utc>,
 }
 
-pub(super) fn render(format: Format, board: &Board, posts: &[Post]) -> String {
-    let mut entries = entries(posts);
+struct Metadata {
+    title: String,
+    description: String,
+    page_url: String,
+    feed_url: String,
+}
+
+pub(super) fn render_board(format: Format, board: &Board, posts: &[Post]) -> String {
+    let page_url = format!("{BASE_URL}/bbs/boards/{}", board.slug);
+    render(
+        format,
+        Metadata {
+            title: format!("salyut.one BBS — {}", board.name),
+            description: board.description.clone(),
+            feed_url: format!("{page_url}/{}.xml", format.slug()),
+            page_url,
+        },
+        posts,
+        false,
+    )
+}
+
+pub(super) fn render_global(format: Format, posts: &[Post]) -> String {
+    render(
+        format,
+        Metadata {
+            title: "salyut.one BBS".to_owned(),
+            description: "Recent posts and replies across all boards.".to_owned(),
+            page_url: format!("{BASE_URL}/bbs"),
+            feed_url: format!("{BASE_URL}/bbs/{}.xml", format.slug()),
+        },
+        posts,
+        true,
+    )
+}
+
+fn render(format: Format, metadata: Metadata, posts: &[Post], include_board: bool) -> String {
+    let mut entries = entries(posts, include_board);
     entries.sort_by(|left, right| {
         right
             .updated
@@ -39,19 +82,29 @@ pub(super) fn render(format: Format, board: &Board, posts: &[Post]) -> String {
     });
     entries.truncate(ENTRY_LIMIT);
     match format {
-        Format::Rss => rss(board, &entries),
-        Format::Atom => atom(board, &entries),
+        Format::Rss => rss(&metadata, &entries),
+        Format::Atom => atom(&metadata, &entries),
     }
 }
 
-fn entries(posts: &[Post]) -> Vec<Entry<'_>> {
+fn entries(posts: &[Post], include_board: bool) -> Vec<Entry<'_>> {
     posts
         .iter()
         .flat_map(|post| {
             let post_url = format!("{BASE_URL}/bbs/posts/{}", post.id);
+            let title = if include_board {
+                format!("[{}] {}", post.board.name, post.title)
+            } else {
+                post.title.clone()
+            };
+            let reply_title = if include_board {
+                format!("[{}] Re: {}", post.board.name, post.title)
+            } else {
+                format!("Re: {}", post.title)
+            };
             let root = Entry {
                 id: post_url.clone(),
-                title: post.title.clone(),
+                title,
                 author: &post.author,
                 body: &post.body,
                 published: post.created_at,
@@ -59,7 +112,7 @@ fn entries(posts: &[Post]) -> Vec<Entry<'_>> {
             };
             std::iter::once(root).chain(post.replies.iter().map(move |reply| Entry {
                 id: format!("{post_url}#reply-{}", reply.id),
-                title: format!("Re: {}", post.title),
+                title: reply_title.clone(),
                 author: &reply.author,
                 body: &reply.body,
                 published: reply.created_at,
@@ -69,10 +122,7 @@ fn entries(posts: &[Post]) -> Vec<Entry<'_>> {
         .collect()
 }
 
-fn rss(board: &Board, entries: &[Entry<'_>]) -> String {
-    let board_url = board_url(board);
-    let feed_url = format!("{board_url}/rss.xml");
-    let title = format!("salyut.one BBS — {}", board.name);
+fn rss(metadata: &Metadata, entries: &[Entry<'_>]) -> String {
     let last_build = entries
         .first()
         .map_or_else(epoch, |entry| entry.updated)
@@ -101,17 +151,14 @@ fn rss(board: &Board, entries: &[Entry<'_>]) -> String {
          <lastBuildDate>{last_build}</lastBuildDate>\
          <atom:link href=\"{}\" rel=\"self\" type=\"application/rss+xml\"/>\
          {items}</channel></rss>\n",
-        xml(&title),
-        xml(&board_url),
-        xml(&board.description),
-        xml(&feed_url),
+        xml(&metadata.title),
+        xml(&metadata.page_url),
+        xml(&metadata.description),
+        xml(&metadata.feed_url),
     )
 }
 
-fn atom(board: &Board, entries: &[Entry<'_>]) -> String {
-    let board_url = board_url(board);
-    let feed_url = format!("{board_url}/atom.xml");
-    let title = format!("salyut.one BBS — {}", board.name);
+fn atom(metadata: &Metadata, entries: &[Entry<'_>]) -> String {
     let updated = entries.first().map_or_else(epoch, |entry| entry.updated);
     let items = entries
         .iter()
@@ -136,17 +183,13 @@ fn atom(board: &Board, entries: &[Entry<'_>]) -> String {
          <subtitle>{}</subtitle><id>{}</id><updated>{}</updated>\
          <link href=\"{}\"/><link href=\"{}\" rel=\"self\" \
          type=\"application/atom+xml\"/>{items}</feed>\n",
-        xml(&title),
-        xml(&board.description),
-        xml(&board_url),
+        xml(&metadata.title),
+        xml(&metadata.description),
+        xml(&metadata.page_url),
         atom_date(updated),
-        xml(&board_url),
-        xml(&feed_url),
+        xml(&metadata.page_url),
+        xml(&metadata.feed_url),
     )
-}
-
-fn board_url(board: &Board) -> String {
-    format!("{BASE_URL}/bbs/boards/{}", board.slug)
 }
 
 fn atom_date(date: DateTime<Utc>) -> String {
@@ -179,7 +222,7 @@ fn xml(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{Format, render};
+    use super::{Format, render_board, render_global};
 
     fn fixture() -> (salyut_bbs::protocol::Board, Vec<salyut_bbs::protocol::Post>) {
         serde_json::from_value(serde_json::json!({
@@ -230,7 +273,7 @@ mod tests {
     #[test]
     fn rss_contains_stable_thread_and_reply_items() {
         let (board, posts) = fixture();
-        let feed = render(Format::Rss, &board, &posts);
+        let feed = render_board(Format::Rss, &board, &posts);
         assert!(feed.starts_with("<?xml version=\"1.0\" encoding=\"utf-8\"?>"));
         assert!(feed.contains("<title>salyut.one BBS — General &amp; chat</title>"));
         assert!(feed.contains("https://salyut.one/bbs/posts/7#reply-9"));
@@ -242,12 +285,22 @@ mod tests {
     #[test]
     fn atom_uses_reply_time_as_feed_update() {
         let (board, posts) = fixture();
-        let feed = render(Format::Atom, &board, &posts);
+        let feed = render_board(Format::Atom, &board, &posts);
         assert!(feed.contains("<updated>2026-07-21T12:01:00Z</updated>"));
         assert!(feed.contains("<author><name>alice &amp; bob</name></author>"));
         assert!(feed.contains("<content type=\"text\">Root &amp; body</content>"));
         assert!(feed.contains(
             "<link href=\"https://salyut.one/bbs/boards/general/atom.xml\" rel=\"self\""
         ));
+    }
+
+    #[test]
+    fn global_feed_identifies_the_source_board() {
+        let (_, posts) = fixture();
+        let feed = render_global(Format::Atom, &posts);
+        assert!(feed.contains("<id>https://salyut.one/bbs</id>"));
+        assert!(feed.contains("<link href=\"https://salyut.one/bbs/atom.xml\" rel=\"self\""));
+        assert!(feed.contains("<title>[General &amp; chat] Hello &lt;world&gt;</title>"));
+        assert!(feed.contains("<title>[General &amp; chat] Re: Hello &lt;world&gt;</title>"));
     }
 }

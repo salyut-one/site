@@ -3,7 +3,8 @@
 Web frontend for https://salyut.one. It serves the homepage, user sites, user
 list, the read-only BBS view at `/bbs`, and system `pinky -lb` output at
 `/now`. Each BBS board publishes RSS and Atom feeds at
-`/bbs/boards/<slug>/rss.xml` and `/bbs/boards/<slug>/atom.xml`.
+`/bbs/boards/<slug>/rss.xml` and `/bbs/boards/<slug>/atom.xml`; aggregate feeds
+for all boards are available at `/bbs/rss.xml` and `/bbs/atom.xml`.
 
 ## Build and test
 

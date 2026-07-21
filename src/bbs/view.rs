@@ -6,14 +6,21 @@ const PAGE: &str = include_str!("../../templates/bbs.html");
 
 pub(super) fn index(boards: &[Board]) -> String {
     let boards = boards.iter().map(board_card).collect::<String>();
-    page(
+    web::page_with_head(
+        PAGE,
         "Message board",
         &format!(
             "<h1>Bulletin Board System</h1>\
              <p>Browse posts here, or log in over SSH and run <code>bbs</code> \
-             to post, reply, and vote.</p><hr>\
+             to post, reply, and vote.</p>\
+             <p class=\"feeds\"><a href=\"/bbs/rss.xml\">[RSS]</a> \
+             <a href=\"/bbs/atom.xml\">[Atom]</a></p><hr>\
              <h2>Boards</h2><ul class=\"boards\">{boards}</ul>"
         ),
+        "<link rel=\"alternate\" type=\"application/rss+xml\" \
+         title=\"salyut.one BBS RSS\" href=\"/bbs/rss.xml\">\
+         <link rel=\"alternate\" type=\"application/atom+xml\" \
+         title=\"salyut.one BBS Atom\" href=\"/bbs/atom.xml\">",
     )
 }
 
@@ -232,7 +239,17 @@ pub(super) fn page(title: &str, content: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{board, post};
+    use super::{board, index, post};
+
+    #[test]
+    fn index_advertises_both_aggregate_feed_formats() {
+        let html = index(&[]);
+        assert!(html.contains(
+            "<link rel=\"alternate\" type=\"application/rss+xml\" title=\"salyut.one BBS RSS\""
+        ));
+        assert!(html.contains("href=\"/bbs/rss.xml\">[RSS]</a>"));
+        assert!(html.contains("href=\"/bbs/atom.xml\">[Atom]</a>"));
+    }
 
     #[test]
     fn board_advertises_both_feed_formats() {
